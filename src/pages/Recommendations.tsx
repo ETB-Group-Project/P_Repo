@@ -6,6 +6,7 @@ import { getRecommendations, getBook } from '@/services/api';
 import { Book, Recommendation } from '@/types';
 import { handleApiError } from '@/utils/errorHandling';
 
+
 /**
  * Recommendations page component with AI-powered suggestions
  */

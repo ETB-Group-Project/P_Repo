@@ -1,6 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { User } from '@/types';
+import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession, } from 'aws-amplify/auth';
+
+
+
 
 /**
  * Authentication context type definition
@@ -91,92 +95,84 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Replace with Cognito session check in Week 3, Day 3-4
-    //
-    // Implementation:
-    // const checkAuth = async () => {
-    //   try {
-    //     const user = await getCurrentUser();
-    //     setUser({
-    //       id: user.userId,
-    //       email: user.signInDetails?.loginId || '',
-    //       name: user.username,
-    //       role: 'user',
-    //       createdAt: new Date().toISOString()
-    //     });
-    //   } catch {
-    //     setUser(null);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // };
-    // checkAuth();
+     const checkAuth = async () => {
 
-    // MOCK: Check localStorage for development
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+       try {
+         const user = await getCurrentUser();
+         const session = await fetchAuthSession();
+         const idToken = session.tokens?.idToken?.payload;
+         const groups = (idToken?.['cognito:groups'] || []) as string[];
+         const isAdmin = groups.includes('Admin');
+
+
+         setUser({
+           id: user.userId,
+           email: user.signInDetails?.loginId || '',
+           name: user.username,
+           groups: groups,
+           role: isAdmin ? 'admin' : 'user',
+           createdAt: new Date().toISOString()
+         });
+
+       } catch {
+         setUser(null);
+       } finally {
+         setIsLoading(false);
+       }
+
+     };
+    checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
+
+  const login = async (email: string, password: string): Promise<void> => {
     try {
-      // TODO: Replace with Cognito Auth.signIn(email, password)
-      // Mock implementation for development
-      void password; // Will be used with Cognito
-      const mockUser: User = {
-        id: '1',
-        email,
-        name: 'John Doe',
-        role: 'user',
-        createdAt: new Date().toISOString(),
-      };
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      const { isSignedIn } = await signIn({ username: email, password });
+
+      if (isSignedIn) {
+        const user = await getCurrentUser();
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.payload;
+        const groups = (idToken?.['cognito:groups'] || []) as string[];
+        const isAdmin = groups.includes('Admin');
+
+        setUser({
+          id: user.userId,
+          email: email,
+          name: user.username,
+          groups: groups,
+          role: isAdmin ? 'admin' : 'user',
+          createdAt: new Date().toISOString()
+        });
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
-
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Replace with Cognito Auth.signOut()
-      setUser(null);
-      localStorage.removeItem('user');
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const signup = async (email: string, password: string, name: string) => {
-    setIsLoading(true);
     try {
-      // TODO: Replace with Cognito Auth.signUp
-      // Mock implementation for development
-      void password; // Will be used with Cognito
-      const mockUser: User = {
-        id: '1',
-        email,
-        name,
-        role: 'user',
-        createdAt: new Date().toISOString(),
-      };
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      await signUp({
+        username: email,
+        password,
+        options: {
+          userAttributes: {
+            email,
+            name,
+          },
+        },
+      });
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
+    }
+  };
+  const logout = async () => {
+    try {
+      await signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
@@ -189,5 +185,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
   };
 
+
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

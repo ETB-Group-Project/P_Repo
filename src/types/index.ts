@@ -18,10 +18,10 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'user' | 'admin';
+  groups: string[]; // <--- İŞTE DİZİ TANIMI BUDUR (Yeni Ekledik)
+  role: 'admin' | 'user'; // (Opsiyonel yaptık, geriye dönük uyumluluk için dursun)
   createdAt: string;
 }
-
 export interface ReadingList {
   id: string;
   userId: string;
@@ -52,4 +52,12 @@ export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+}
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
